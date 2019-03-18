@@ -30,7 +30,10 @@
 #undef id
 #undef Class
 
+// Objective-C中的类其实是objc_class结构体
 typedef struct objc_class *Class;
+
+// 这里就是Objective-C中用到的id类型
 typedef struct objc_object *id;
 
 #if __OBJC2__

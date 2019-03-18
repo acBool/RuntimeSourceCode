@@ -171,6 +171,7 @@ objc_object::hasNonpointerIsa()
 }
 
 
+// 无论是类对象，还是实例对象，还是协议对象，最后初始化isa方法都是调用了initIsa方法，只是参数不同
 inline void 
 objc_object::initIsa(Class cls)
 {
@@ -210,9 +211,11 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
     if (!nonpointer) {
         isa.cls = cls;
     } else {
+        // 实例对象的isa初始化直接走else分之
         assert(!DisableNonpointerIsa);
         assert(!cls->instancesRequireRawIsa());
 
+        // 初始化一个心得isa_t结构体
         isa_t newisa(0);
 
 #if SUPPORT_INDEXED_ISA
@@ -223,10 +226,15 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
         newisa.has_cxx_dtor = hasCxxDtor;
         newisa.indexcls = (uintptr_t)cls->classArrayIndex();
 #else
+        // 对新结构体newisa赋值
+        // ISA_MAGIC_VALUE的值是0x001d800000000001ULL，转化成二进制是64位
+        // 根据注释，使用ISA_MAGIC_VALUE赋值，实际上只是赋值了isa.magic和isa.nonpointer
         newisa.bits = ISA_MAGIC_VALUE;
         // isa.magic is part of ISA_MAGIC_VALUE
         // isa.nonpointer is part of ISA_MAGIC_VALUE
         newisa.has_cxx_dtor = hasCxxDtor;
+        // 将当前对象的类指针赋值到shiftcls
+        // 类的指针是按照字节（8bits）对齐的，其指针后三位都是没有意义的0，因此可以右移e3位
         newisa.shiftcls = (uintptr_t)cls >> 3;
 #endif
 
@@ -236,6 +244,7 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
         // fixme use atomics here to guarantee single-store and to
         // guarantee memory order w.r.t. the class index table
         // ...but not too atomic because we don't want to hurt instantiation
+        // 赋值。看注释这个地方不是线程安全的？？
         isa = newisa;
     }
 }

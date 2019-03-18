@@ -56,15 +56,30 @@ namespace {
     struct SideTable;
 };
 
+
+// 在isa.h中有一些宏定义，比如 ISA_MASK、ISA_MAGIC_MASK、ISA_MAGIC_VALUE
 #include "isa.h"
 
+// isa_t是一个联合体（联合体中的变量共用同一块地址空间。也就是说，cls、bits、结构体共用同一块地址空间）
 union isa_t {
     isa_t() { }
     isa_t(uintptr_t value) : bits(value) { }
 
     Class cls;
+    // 相当于是unsigned long bits;
     uintptr_t bits;
 #if defined(ISA_BITFIELD)
+    // 这里的定义在isa.h中，如下(注意uintptr_t实际上就是unsigned long)
+//    uintptr_t nonpointer        : 1;                                         \
+//    uintptr_t has_assoc         : 1;                                         \
+//    uintptr_t has_cxx_dtor      : 1;                                         \
+//    uintptr_t shiftcls          : 44; /*MACH_VM_MAX_ADDRESS 0x7fffffe00000*/ \
+//    uintptr_t magic             : 6;                                         \
+//    uintptr_t weakly_referenced : 1;                                         \
+//    uintptr_t deallocating      : 1;                                         \
+//    uintptr_t has_sidetable_rc  : 1;                                         \
+//    uintptr_t extra_rc          : 8
+    
     struct {
         ISA_BITFIELD;  // defined in isa.h
     };
@@ -73,6 +88,7 @@ union isa_t {
 
 
 struct objc_object {
+    // isa结构体
 private:
     isa_t isa;
 
@@ -84,6 +100,8 @@ public:
     // getIsa() allows this to be a tagged pointer object
     Class getIsa();
 
+    // 初始化isa会使用initIsa()方法
+    // 实例对象、类对象、协议对象、其他对象初始化isa结构体，最终都会调用initIsa()方法
     // initIsa() should be used to init the isa of new objects only.
     // If this object already has an isa, use changeIsa() for correctness.
     // initInstanceIsa(): objects with no custom RR/AWZ
