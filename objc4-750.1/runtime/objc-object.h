@@ -148,6 +148,7 @@ objc_object::isExtTaggedPointer()
 
 #if SUPPORT_NONPOINTER_ISA
 
+// ISA()方法用于返回类指针
 inline Class 
 objc_object::ISA() 
 {
@@ -159,6 +160,8 @@ objc_object::ISA()
     }
     return (Class)isa.bits;
 #else
+    // ISA_MASK的值是0x00007ffffffffff8ULL
+    // 通过按位与的方式获取到类指针，ISA_MASK中对应的isa.bits中类指针的位数，均为1
     return (Class)(isa.bits & ISA_MASK);
 #endif
 }
@@ -209,9 +212,10 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
     assert(!isTaggedPointer()); 
     
     if (!nonpointer) {
+        // 如果访问isa直接返回的是类指针
         isa.cls = cls;
     } else {
-        // 实例对象的isa初始化直接走else分之
+        // 实例对象的isa初始化直接走else分之（是isa结构体）
         assert(!DisableNonpointerIsa);
         assert(!cls->instancesRequireRawIsa());
 
@@ -234,7 +238,7 @@ objc_object::initIsa(Class cls, bool nonpointer, bool hasCxxDtor)
         // isa.nonpointer is part of ISA_MAGIC_VALUE
         newisa.has_cxx_dtor = hasCxxDtor;
         // 将当前对象的类指针赋值到shiftcls
-        // 类的指针是按照字节（8bits）对齐的，其指针后三位都是没有意义的0，因此可以右移e3位
+        // 类的指针是按照字节（8bits）对齐的，其指针后三位都是没有意义的0，因此可以右移3位
         newisa.shiftcls = (uintptr_t)cls >> 3;
 #endif
 

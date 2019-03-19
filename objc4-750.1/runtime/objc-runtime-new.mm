@@ -6507,7 +6507,10 @@ _class_createInstanceFromZone(Class cls, size_t extraBytes, void *zone,
                               size_t *outAllocatedSize = nil)
 {
     if (!cls) return nil;
-
+    // 这里可以打印类指针的地址,类指针地址最后一位是十六进制的8或者0，说明
+    // 类指针地址后三位都是0
+    printf("cls address = %p\n",cls);
+    
     assert(cls->isRealized());
 
     // Read class's info bits all at once for performance
@@ -6531,6 +6534,9 @@ _class_createInstanceFromZone(Class cls, size_t extraBytes, void *zone,
             obj = (id)calloc(1, size);
         }
         if (!obj) return nil;
+        // 这里可以打印对象的地址，对象地址的最后一位是十六进制的0，说明对象地址后四位都是0
+        // 对象地址是16位对齐的
+        //printf("obj address = %p\n",obj);
 
         // Use raw pointer isa on the assumption that they might be 
         // doing something weird with the zone or RR.
