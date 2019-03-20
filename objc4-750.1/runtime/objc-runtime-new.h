@@ -549,7 +549,8 @@ struct locstamped_category_list_t {
 static_assert(FAST_IS_SWIFT_LEGACY == 1, "resistance is futile");
 static_assert(FAST_IS_SWIFT_STABLE == 2, "resistance is futile");
 
-
+// class_ro_t结构体存储了类在编译期就已经确定的属性、方法以及遵循的协议
+// 因为在编译期就已经确定了，所以是ro(readonly)的，不可修改
 struct class_ro_t {
     uint32_t flags;
     uint32_t instanceStart;
@@ -561,11 +562,15 @@ struct class_ro_t {
     const uint8_t * ivarLayout;
     
     const char * name;
+    // 方法列表
     method_list_t * baseMethodList;
+    // 协议列表
     protocol_list_t * baseProtocols;
+    // 变量列表
     const ivar_list_t * ivars;
 
     const uint8_t * weakIvarLayout;
+    // 属性列表
     property_list_t *baseProperties;
 
     method_list_t *baseMethods() const {
@@ -823,15 +828,19 @@ class protocol_array_t :
 };
 
 
+// 类的方法、属性、协议等信息都保存在class_rw_t结构体中
 struct class_rw_t {
     // Be warned that Symbolication knows the layout of this structure.
     uint32_t flags;
     uint32_t version;
 
     const class_ro_t *ro;
-
+    
+    // 方法信息
     method_array_t methods;
+    // 属性信息
     property_array_t properties;
+    // 协议信息
     protocol_array_t protocols;
 
     Class firstSubclass;
@@ -870,6 +879,8 @@ struct class_rw_t {
 struct class_data_bits_t {
 
     // Values are the FAST_ flags above.
+    // 相当于 unsigned long bits; 占64位
+    // bits实际上是一个地址（是一个对象的指针，可以指向class_ro_t，也可以指向class_rw_t）
     uintptr_t bits;
 private:
     bool getBit(uintptr_t bit)
@@ -920,6 +931,8 @@ private:
 public:
 
     class_rw_t* data() {
+        // FAST_DATA_MASK的值是0x00007ffffffffff8UL
+        // bits和FAST_DATA_MASK按位与，实际上就是取了bits中的[3,47]位
         return (class_rw_t *)(bits & FAST_DATA_MASK);
     }
     void setData(class_rw_t *newData)
@@ -1113,7 +1126,9 @@ public:
 struct objc_class : objc_object {
     // Class ISA;
     Class superclass;
+    // 缓存的是指针和vtable,目的是加速方法的调用
     cache_t cache;             // formerly cache pointer and vtable
+    // class_data_bits_t 相当于是class_rw_t 指针加上rr/alloc标志
     class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
 
     class_rw_t *data() { 

@@ -759,6 +759,9 @@ prepareMethodLists(Class cls, method_list_t **addedLists, int addedCount,
 // Attach method lists and properties and protocols from categories to a class.
 // Assumes the categories in cats are all loaded and sorted by load order, 
 // oldest categories first.
+// 将category中的属性、协议、方法添加到类中
+// 既然可以添加category中的属性，为何不设计成可以添加实例变量？
+// category不能添加实例变量，那在category中添加属性的意义又是什么？
 static void 
 attachCategories(Class cls, category_list *cats, bool flush_caches)
 {
@@ -823,6 +826,7 @@ attachCategories(Class cls, category_list *cats, bool flush_caches)
 * Attaches any outstanding categories.
 * Locking: runtimeLock must be held by the caller
 **********************************************************************/
+// 设置类的方法列表、协议列表、属性列表，包括category的方法
 static void methodizeClass(Class cls)
 {
     runtimeLock.assertLocked();
@@ -838,17 +842,20 @@ static void methodizeClass(Class cls)
     }
 
     // Install methods and properties that the class implements itself.
+    // 将class_ro_t中的methodList添加到class_rw_t结构体中的methodList
     method_list_t *list = ro->baseMethods();
     if (list) {
         prepareMethodLists(cls, &list, 1, YES, isBundleClass(cls));
         rw->methods.attachLists(&list, 1);
     }
 
+    // 将class_ro_t中的propertyList添加到class_rw_t结构体中的propertyList
     property_list_t *proplist = ro->baseProperties;
     if (proplist) {
         rw->properties.attachLists(&proplist, 1);
     }
 
+    // 将class_ro_t中的protocolList添加到class_rw_t结构体中的protocolList
     protocol_list_t *protolist = ro->baseProtocols;
     if (protolist) {
         rw->protocols.attachLists(&protolist, 1);
@@ -862,6 +869,7 @@ static void methodizeClass(Class cls)
     }
 
     // Attach categories.
+    // 添加category方法
     category_list *cats = unattachedCategoriesForClass(cls, true /*realizing*/);
     attachCategories(cls, cats, false /*don't flush caches*/);
 
@@ -1855,6 +1863,7 @@ static void reconcileInstanceVariables(Class cls, Class supercls, const class_ro
 * Returns the real class structure for the class. 
 * Locking: runtimeLock must be write-locked by the caller
 **********************************************************************/
+// 该方法包括初始化类的read-write数据，并返回真正的类结构
 static Class realizeClass(Class cls)
 {
     runtimeLock.assertLocked();
@@ -1866,22 +1875,30 @@ static Class realizeClass(Class cls)
     bool isMeta;
 
     if (!cls) return nil;
+    // 如果类已经实现了，直接返回
     if (cls->isRealized()) return cls;
     assert(cls == remapClass(cls));
 
     // fixme verify class is not in an un-dlopened part of the shared cache?
 
+    // 编译期间，cls->data指向的是class_ro_t结构体
+    // 因此这里强制转成class_ro_t没有问题
     ro = (const class_ro_t *)cls->data();
     if (ro->flags & RO_FUTURE) {
+        // rw结构体已经被初始化（正常不会执行到这里）
         // This was a future class. rw data is already allocated.
         rw = cls->data();
         ro = cls->data()->ro;
         cls->changeInfo(RW_REALIZED|RW_REALIZING, RW_FUTURE);
     } else {
+        // 正常的类都是执行到这里
         // Normal class. Allocate writeable class data.
+        // 初始化class_rw_t结构体
         rw = (class_rw_t *)calloc(sizeof(class_rw_t), 1);
+        // 赋值class_rw_t的class_ro_t，也就是ro
         rw->ro = ro;
         rw->flags = RW_REALIZED|RW_REALIZING;
+        // cls->data 指向class_rw_t结构体
         cls->setData(rw);
     }
 
@@ -1968,6 +1985,7 @@ static Class realizeClass(Class cls)
     }
 
     // Attach categories
+    // 将类实现的方法（包括分类）、属性和遵循的协议添加到class_rw_t结构体中的methods、properties、protocols列表中
     methodizeClass(cls);
 
     return cls;
@@ -6509,7 +6527,7 @@ _class_createInstanceFromZone(Class cls, size_t extraBytes, void *zone,
     if (!cls) return nil;
     // 这里可以打印类指针的地址,类指针地址最后一位是十六进制的8或者0，说明
     // 类指针地址后三位都是0
-    printf("cls address = %p\n",cls);
+    //printf("cls address = %p\n",cls);
     
     assert(cls->isRealized());
 

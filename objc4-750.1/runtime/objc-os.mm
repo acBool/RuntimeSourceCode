@@ -871,7 +871,7 @@ void _objc_atfork_child()
 * Bootstrap initialization. Registers our image notifier with dyld.
 * Called by libSystem BEFORE library initialization time
 **********************************************************************/
-
+// Runtime初始化方法
 void _objc_init(void)
 {
     static bool initialized = false;
@@ -884,7 +884,8 @@ void _objc_init(void)
     static_init();
     lock_init();
     exception_init();
-
+    
+    // _objc_init->map_images->map_images_nolock->_read_images->realizeClass
     _dyld_objc_notify_register(&map_images, load_images, unmap_image);
 }
 
