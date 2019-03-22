@@ -1878,12 +1878,20 @@ static Class realizeClass(Class cls)
     // 如果类已经实现了，直接返回
     if (cls->isRealized()) return cls;
     assert(cls == remapClass(cls));
+//    printf("cache bits = %d\n",sizeof(cls->cache));
+//    printf("super bits = %d\n",sizeof(cls->superclass));
+//    printf("isa bits = %d\n",sizeof(cls->ISA()));
 
     // fixme verify class is not in an un-dlopened part of the shared cache?
 
     // 编译期间，cls->data指向的是class_ro_t结构体
     // 因此这里强制转成class_ro_t没有问题
     ro = (const class_ro_t *)cls->data();
+    //printf("nname = %s",ro->name);
+    int flag = strcmp("Person",ro->name);
+    if(flag == 0){
+        printf("nname = %s\n",ro->name);
+    }
     if (ro->flags & RO_FUTURE) {
         // rw结构体已经被初始化（正常不会执行到这里）
         // This was a future class. rw data is already allocated.

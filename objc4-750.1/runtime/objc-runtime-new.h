@@ -932,7 +932,7 @@ public:
 
     class_rw_t* data() {
         // FAST_DATA_MASK的值是0x00007ffffffffff8UL
-        // bits和FAST_DATA_MASK按位与，实际上就是取了bits中的[3,47]位
+        // bits和FAST_DATA_MASK按位与，实际上就是取了bits中的[3,46]位
         return (class_rw_t *)(bits & FAST_DATA_MASK);
     }
     void setData(class_rw_t *newData)
@@ -1124,14 +1124,17 @@ public:
 // objc_class继承于objc_object,因此
 // objc_class中也有isa结构体
 struct objc_class : objc_object {
+    // ISA占8位
     // Class ISA;
+    // superclass占8位
     Class superclass;
-    // 缓存的是指针和vtable,目的是加速方法的调用
+    // 缓存的是指针和vtable,目的是加速方法的调用  cache占16位
     cache_t cache;             // formerly cache pointer and vtable
     // class_data_bits_t 相当于是class_rw_t 指针加上rr/alloc标志
     class_data_bits_t bits;    // class_rw_t * plus custom rr/alloc flags
 
-    class_rw_t *data() { 
+    class_rw_t *data() {
+        // 这里的bits就是class_data_bits_t bits;
         return bits.data();
     }
     void setData(class_rw_t *newData) {

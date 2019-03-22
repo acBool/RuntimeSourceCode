@@ -9,4 +9,9 @@
 
 @implementation Person
 
+- (void)say
+{
+    NSLog(@"hello,world!");
+}
+
 @end

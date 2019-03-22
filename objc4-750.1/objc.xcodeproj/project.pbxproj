@@ -118,6 +118,8 @@
 		9672F7EE14D5F488007CEC96 /* NSObject.mm in Sources */ = {isa = PBXBuildFile; fileRef = 9672F7ED14D5F488007CEC96 /* NSObject.mm */; };
 		E8923DA5116AB2820071B552 /* objc-block-trampolines.mm in Sources */ = {isa = PBXBuildFile; fileRef = E8923DA0116AB2820071B552 /* objc-block-trampolines.mm */; };
 		F00FD3A3223B905F00A2CB68 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = F00FD3A2223B905F00A2CB68 /* main.m */; };
+		F0B786DC224389470098C355 /* Person.m in Sources */ = {isa = PBXBuildFile; fileRef = F0B786DB224389470098C355 /* Person.m */; };
+		F0FA6F732244959D00E71054 /* Person+Fly.m in Sources */ = {isa = PBXBuildFile; fileRef = F0FA6F722244959D00E71054 /* Person+Fly.m */; };
 		F9BCC71B205C68E800DD9AFC /* objc-blocktramps-arm64.s in Sources */ = {isa = PBXBuildFile; fileRef = 8379996D13CBAF6F007C2B5F /* objc-blocktramps-arm64.s */; };
 /* End PBXBuildFile section */
 
@@ -253,6 +255,10 @@
 		E8923DA0116AB2820071B552 /* objc-block-trampolines.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = "objc-block-trampolines.mm"; path = "runtime/objc-block-trampolines.mm"; sourceTree = "<group>"; };
 		F00FD3A0223B905F00A2CB68 /* runtimeTest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = runtimeTest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F00FD3A2223B905F00A2CB68 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		F0B786DA224389470098C355 /* Person.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Person.h; sourceTree = "<group>"; };
+		F0B786DB224389470098C355 /* Person.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Person.m; sourceTree = "<group>"; };
+		F0FA6F712244959D00E71054 /* Person+Fly.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Person+Fly.h"; sourceTree = "<group>"; };
+		F0FA6F722244959D00E71054 /* Person+Fly.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = "Person+Fly.m"; sourceTree = "<group>"; };
 		F9BCC727205C68E800DD9AFC /* libobjc-trampolines.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = "libobjc-trampolines.dylib"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -454,6 +460,10 @@
 			isa = PBXGroup;
 			children = (
 				F00FD3A2223B905F00A2CB68 /* main.m */,
+				F0B786DA224389470098C355 /* Person.h */,
+				F0B786DB224389470098C355 /* Person.m */,
+				F0FA6F712244959D00E71054 /* Person+Fly.h */,
+				F0FA6F722244959D00E71054 /* Person+Fly.m */,
 			);
 			path = runtimeTest;
 			sourceTree = "<group>";
@@ -737,7 +747,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0B786DC224389470098C355 /* Person.m in Sources */,
 				F00FD3A3223B905F00A2CB68 /* main.m in Sources */,
+				F0FA6F732244959D00E71054 /* Person+Fly.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
