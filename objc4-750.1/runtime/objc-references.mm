@@ -152,11 +152,15 @@ namespace objc_references_support {
     inline disguised_ptr_t DISGUISE(id value) { return ~uintptr_t(value); }
     inline id UNDISGUISE(disguised_ptr_t dptr) { return id(~dptr); }
   
+    // ObjcAssociation就是关联对象类
     class ObjcAssociation {
         uintptr_t _policy;
+        // 值
         id _value;
     public:
+        // 构造函数
         ObjcAssociation(uintptr_t policy, id value) : _policy(policy), _value(value) {}
+        // 默认构造函数，参数分别为0和nil
         ObjcAssociation() : _policy(0), _value(nil) {}
 
         uintptr_t policy() const { return _policy; }
@@ -170,12 +174,17 @@ namespace objc_references_support {
     typedef hash_map<disguised_ptr_t, ObjectAssociationMap *> AssociationsHashMap;
 #else
     typedef ObjcAllocator<std::pair<void * const, ObjcAssociation> > ObjectAssociationMapAllocator;
+    
+    // ObjectAssociationMap是字典，key是从外面传过来的key，例如@selector(hello),value是关联对象，也就是
+    // ObjectAssociation
     class ObjectAssociationMap : public std::map<void *, ObjcAssociation, ObjectPointerLess, ObjectAssociationMapAllocator> {
     public:
         void *operator new(size_t n) { return ::malloc(n); }
         void operator delete(void *ptr) { ::free(ptr); }
     };
     typedef ObjcAllocator<std::pair<const disguised_ptr_t, ObjectAssociationMap*> > AssociationsHashMapAllocator;
+    
+    // AssociationsHashMap是字典，key是对象的disguised_ptr_t值，value是ObjectAssociationMap
     class AssociationsHashMap : public unordered_map<disguised_ptr_t, ObjectAssociationMap *, DisguisedPointerHash, DisguisedPointerEqual, AssociationsHashMapAllocator> {
     public:
         void *operator new(size_t n) { return ::malloc(n); }
@@ -194,12 +203,17 @@ spinlock_t AssociationsManagerLock;
 
 class AssociationsManager {
     // associative references: object pointer -> PtrPtrHashMap.
+    // AssociationsManager中只有一个变量AssociationsHashMap
     static AssociationsHashMap *_map;
 public:
+    // 构造函数中加锁
     AssociationsManager()   { AssociationsManagerLock.lock(); }
+    // 析构函数中释放锁
     ~AssociationsManager()  { AssociationsManagerLock.unlock(); }
+    // 构造函数、析构函数中加锁、释放锁的操作，保证了AssociationsManager是线程安全的
     
     AssociationsHashMap &associations() {
+        // AssociationsHashMap 的实现可以理解成单例对象
         if (_map == NULL)
             _map = new AssociationsHashMap();
         return *_map;
@@ -219,19 +233,25 @@ enum {
     OBJC_ASSOCIATION_GETTER_AUTORELEASE = (2 << 8)
 }; 
 
+// 获取关联对象
 id _object_get_associative_reference(id object, void *key) {
     id value = nil;
     uintptr_t policy = OBJC_ASSOCIATION_ASSIGN;
     {
         AssociationsManager manager;
+        // 获取到manager中的AssociationsHashMap
         AssociationsHashMap &associations(manager.associations());
+        // 获取对象的DISGUISE值
         disguised_ptr_t disguised_object = DISGUISE(object);
         AssociationsHashMap::iterator i = associations.find(disguised_object);
         if (i != associations.end()) {
+            // 获取ObjectAssociationMap
             ObjectAssociationMap *refs = i->second;
             ObjectAssociationMap::iterator j = refs->find(key);
             if (j != refs->end()) {
+                // 获取到关联对象ObjcAssociation
                 ObjcAssociation &entry = j->second;
+                // 获取到value
                 value = entry.value();
                 policy = entry.policy();
                 if (policy & OBJC_ASSOCIATION_GETTER_RETAIN) {
@@ -243,9 +263,11 @@ id _object_get_associative_reference(id object, void *key) {
     if (value && (policy & OBJC_ASSOCIATION_GETTER_AUTORELEASE)) {
         objc_autorelease(value);
     }
+    // 返回关联对像的值
     return value;
 }
 
+// 根据policy的值，对value进行retain或者copy
 static id acquireValue(id value, uintptr_t policy) {
     switch (policy & 0xFF) {
     case OBJC_ASSOCIATION_SETTER_RETAIN:
@@ -264,61 +286,85 @@ static void releaseValue(id value, uintptr_t policy) {
 
 struct ReleaseValue {
     void operator() (ObjcAssociation &association) {
+        // 根据policy值，释放value
         releaseValue(association.value(), association.policy());
     }
 };
 
+// 该方法完成了设置关联对象的操作
 void _object_set_associative_reference(id object, void *key, id value, uintptr_t policy) {
     // retain the new value (if any) outside the lock.
+    // 初始化空的ObjcAssociation(关联对象)
     ObjcAssociation old_association(0, nil);
     id new_value = value ? acquireValue(value, policy) : nil;
     {
+        // 初始化一个manager
         AssociationsManager manager;
         AssociationsHashMap &associations(manager.associations());
+        // 获取对象的DISGUISE值，作为AssociationsHashMap的key
         disguised_ptr_t disguised_object = DISGUISE(object);
         if (new_value) {
+            // value有值，不为nil
             // break any existing association.
+            // AssociationsHashMap::iterator 类型的迭代器
             AssociationsHashMap::iterator i = associations.find(disguised_object);
             if (i != associations.end()) {
                 // secondary table exists
+                // 获取到ObjectAssociationMap(key是外部传来的key，value是关联对象类ObjcAssociation)
                 ObjectAssociationMap *refs = i->second;
+                // ObjectAssociationMap::iterator 类型的迭代器
                 ObjectAssociationMap::iterator j = refs->find(key);
                 if (j != refs->end()) {
+                    // 原来该key对应的有关联对象
+                    // 将原关联对象的值存起来，并且赋新值
                     old_association = j->second;
                     j->second = ObjcAssociation(policy, new_value);
                 } else {
+                    // 无该key对应的关联对象，直接赋值即可
+                    // ObjcAssociation(policy, new_value)提供了这样的构造函数
                     (*refs)[key] = ObjcAssociation(policy, new_value);
                 }
             } else {
                 // create the new association (first time).
+                // 执行到这里，说明该对象是第一次添加关联对象
+                // 初始化ObjectAssociationMap
                 ObjectAssociationMap *refs = new ObjectAssociationMap;
                 associations[disguised_object] = refs;
+                // 赋值
                 (*refs)[key] = ObjcAssociation(policy, new_value);
+                // 设置该对象的有关联对象，调用的是setHasAssociatedObjects()方法
                 object->setHasAssociatedObjects();
             }
         } else {
             // setting the association to nil breaks the association.
+            // value无值，也就是释放一个key对应的关联对象
             AssociationsHashMap::iterator i = associations.find(disguised_object);
             if (i !=  associations.end()) {
                 ObjectAssociationMap *refs = i->second;
                 ObjectAssociationMap::iterator j = refs->find(key);
                 if (j != refs->end()) {
                     old_association = j->second;
+                    // 调用erase()方法删除对应的关联对象
                     refs->erase(j);
                 }
             }
         }
     }
     // release the old value (outside of the lock).
+    // 释放旧的关联对象
     if (old_association.hasValue()) ReleaseValue()(old_association);
 }
 
+// 移除对象object的所有关联对象
 void _object_remove_assocations(id object) {
+    // 声明了一个vector
     vector< ObjcAssociation,ObjcAllocator<ObjcAssociation> > elements;
     {
         AssociationsManager manager;
         AssociationsHashMap &associations(manager.associations());
+        // 如果map size为空，直接返回
         if (associations.size() == 0) return;
+        // 获取对象的DISGUISE值
         disguised_ptr_t disguised_object = DISGUISE(object);
         AssociationsHashMap::iterator i = associations.find(disguised_object);
         if (i != associations.end()) {

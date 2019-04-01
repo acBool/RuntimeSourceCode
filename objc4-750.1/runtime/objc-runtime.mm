@@ -561,16 +561,18 @@ void objc_setEnumerationMutationHandler(void (*handler)(id)) {
 * Associative Reference Support
 **********************************************************************/
 
+// 获取关联对象的方法
 id objc_getAssociatedObject(id object, const void *key) {
     return _object_get_associative_reference(object, (void *)key);
 }
 
 
+// 设置关联对象的方法
 void objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy) {
     _object_set_associative_reference(object, (void *)key, value, policy);
 }
 
-
+// 移除对象object的所有关联对象
 void objc_removeAssociatedObjects(id object) 
 {
     if (object && object->hasAssociatedObjects()) {
