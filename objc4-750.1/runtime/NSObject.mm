@@ -633,6 +633,7 @@ struct magic_t {
 };
     
 
+// AutoreleasePoolPage的大小是4096字节
 class AutoreleasePoolPage 
 {
     // EMPTY_POOL_PLACEHOLDER is stored in TLS when exactly one pool is 
@@ -644,7 +645,8 @@ class AutoreleasePoolPage
 #   define POOL_BOUNDARY nil
     static pthread_key_t const key = AUTORELEASE_POOL_KEY;
     static uint8_t const SCRIBBLE = 0xA3;  // 0xA3A3A3A3 after releasing
-    static size_t const SIZE = 
+    // AutoreleasePoolPage的大小，通过宏定义，可以看到是4096字节
+    static size_t const SIZE =
 #if PROTECT_AUTORELEASEPOOL
         PAGE_MAX_SIZE;  // must be multiple of vm page size
 #else
@@ -653,9 +655,15 @@ class AutoreleasePoolPage
     static size_t const COUNT = SIZE / sizeof(id);
 
     magic_t const magic;
+    // 一个AutoreleasePoolPage中会存储多个对象
+    // next指向的是下一个AutoreleasePoolPage中下一个为空的内存地址（新来的对象会存储到next处）
     id *next;
+    // 保存了当前页所在的线程
     pthread_t const thread;
+    // AutoreleasePoolPage是以双向链表的形式连接
+    // 前一个节点
     AutoreleasePoolPage * const parent;
+    // 后一个节点
     AutoreleasePoolPage *child;
     uint32_t const depth;
     uint32_t hiwat;
@@ -683,6 +691,7 @@ class AutoreleasePoolPage
 #endif
     }
 
+    // 构造方法（参数是新的AutoreleasePoolPage的parent）
     AutoreleasePoolPage(AutoreleasePoolPage *newParent) 
         : magic(), next(begin()), thread(pthread_self()),
           parent(newParent), child(nil), 
@@ -745,10 +754,12 @@ class AutoreleasePoolPage
     }
 
 
+    // AutoreleasePoolPage开始地址
     id * begin() {
         return (id *) ((uint8_t *)this+sizeof(*this));
     }
 
+    // AutoreleasePoolPage结束地址
     id * end() {
         return (id *) ((uint8_t *)this+SIZE);
     }
@@ -765,6 +776,7 @@ class AutoreleasePoolPage
         return (next - begin() < (end() - begin()) / 2);
     }
 
+    // 将对象添加到AutoreleasePoolPage中
     id *add(id obj)
     {
         assert(!full());
@@ -921,12 +933,18 @@ class AutoreleasePoolPage
 
     static inline id *autoreleaseFast(id obj)
     {
+        // hotPage就是当前正在使用的AutoreleasePoolPage
         AutoreleasePoolPage *page = hotPage();
         if (page && !page->full()) {
+            // 有hotPage且hotPage不满，将对象添加到hotPage中
             return page->add(obj);
         } else if (page) {
+            // 有hotPage但是hotPage已满
+            // 使用autoreleaseFullPage初始化一个新页，并将对象添加到新的AutoreleasePoolPage中
             return autoreleaseFullPage(obj, page);
         } else {
+            // 无hotPage
+            // 使用autoreleaseNoPage创建一个hotPage,并将对象添加到新创建的page中
             return autoreleaseNoPage(obj);
         }
     }
@@ -941,11 +959,15 @@ class AutoreleasePoolPage
         assert(page->full()  ||  DebugPoolAllocation);
 
         do {
+            // 如果page->child不为空，那么使用page->child
             if (page->child) page = page->child;
+            // 否则的话，初始化一个新的AutoreleasePoolPage
             else page = new AutoreleasePoolPage(page);
         } while (page->full());
 
+        // 将找到的合适的page设置成hotPage
         setHotPage(page);
+        // 将对象添加到hotPage中
         return page->add(obj);
     }
 
@@ -985,15 +1007,20 @@ class AutoreleasePoolPage
         // We are pushing an object or a non-placeholder'd pool.
 
         // Install the first page.
+        // 初始化一个AutoreleasePoolPage
+        // 当前内存中不存在AutoreleasePoolPage,则从头开始构建AutoreleasePoolPage,也就是其parent为nil
         AutoreleasePoolPage *page = new AutoreleasePoolPage(nil);
+        // 将初始化的AutoreleasePoolPage设置成hotPage
         setHotPage(page);
         
         // Push a boundary on behalf of the previously-placeholder'd pool.
+        // 添加一个边界对象（nil）
         if (pushExtraBoundary) {
             page->add(POOL_BOUNDARY);
         }
         
         // Push the requested object or pool.
+        // 将对象添加到AutoreleasePoolPage中
         return page->add(obj);
     }
 
@@ -1017,9 +1044,11 @@ public:
     }
 
 
+    // push方法
     static inline void *push() 
     {
         id *dest;
+        // POOL_BOUNDARY就是nil
         if (DebugPoolAllocation) {
             // Each autorelease pool starts on a new pool page.
             dest = autoreleaseNewPage(POOL_BOUNDARY);
