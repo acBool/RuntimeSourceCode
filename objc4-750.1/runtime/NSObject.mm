@@ -658,7 +658,7 @@ class AutoreleasePoolPage
     // 一个AutoreleasePoolPage中会存储多个对象
     // next指向的是下一个AutoreleasePoolPage中下一个为空的内存地址（新来的对象会存储到next处）
     id *next;
-    // 保存了当前页所在的线程
+    // 保存了当前页所在的线程(一个AutoreleasePoolPage属于一个线程，一个线程中可以有多个AutoreleasePoolPage)
     pthread_t const thread;
     // AutoreleasePoolPage是以双向链表的形式连接
     // 前一个节点
@@ -677,6 +677,7 @@ class AutoreleasePoolPage
         return free(p);
     }
 
+    // 不用看
     inline void protect() {
 #if PROTECT_AUTORELEASEPOOL
         mprotect(this, SIZE, PROT_READ);
@@ -684,6 +685,7 @@ class AutoreleasePoolPage
 #endif
     }
 
+    // 不用看
     inline void unprotect() {
 #if PROTECT_AUTORELEASEPOOL
         check();
@@ -702,12 +704,14 @@ class AutoreleasePoolPage
             parent->check();
             assert(!parent->child);
             parent->unprotect();
+            // parent的child指针指向this,也就是当前AutoreleasePoolPage对象
             parent->child = this;
             parent->protect();
         }
         protect();
     }
 
+    // 析构函数
     ~AutoreleasePoolPage() 
     {
         check();
@@ -754,20 +758,24 @@ class AutoreleasePoolPage
     }
 
 
-    // AutoreleasePoolPage开始地址
+    // AutoreleasePoolPage开始地址，开始地址可以理解为第一个为空的地址
+    // 也就是存放第一个对象的地址
     id * begin() {
         return (id *) ((uint8_t *)this+sizeof(*this));
     }
 
     // AutoreleasePoolPage结束地址
     id * end() {
+        // SIZE 就是4096字节
         return (id *) ((uint8_t *)this+SIZE);
     }
 
+    // 是否为空
     bool empty() {
         return next == begin();
     }
 
+    // 是否已满
     bool full() { 
         return next == end();
     }
@@ -782,42 +790,58 @@ class AutoreleasePoolPage
         assert(!full());
         unprotect();
         id *ret = next;  // faster than `return next-1` because of aliasing
+        // next = obj; next++;
+        // 也就是将obj存放在next处，并将next移动到下一个位置
         *next++ = obj;
         protect();
         return ret;
     }
 
+    // 释放AutoreleasePool中的所有对象
     void releaseAll() 
     {
         releaseUntil(begin());
     }
 
+    // 释放对象
+    // 这里需要注意的是，因为AutoreleasePool实际上就是由AutoreleasePoolPage组成的双向链表
+    // 因此，*stop可能不是在最新的AutoreleasePoolPage中，也就是下面的hotPage，这时需要从hotPage
+    // 开始，一直释放，直到stop，中间所经过的所有AutoreleasePoolPage,里面的对象都要释放
     void releaseUntil(id *stop) 
     {
         // Not recursive: we don't want to blow out the stack 
         // if a thread accumulates a stupendous amount of garbage
         
+        // 释放AutoreleasePoolPage中的对象，直到next指向stop
         while (this->next != stop) {
             // Restart from hotPage() every time, in case -release 
             // autoreleased more objects
+            // hotPage可以理解为当前正在使用的page
             AutoreleasePoolPage *page = hotPage();
 
             // fixme I think this `while` can be `if`, but I can't prove it
+            // 如果page为空的话，将page指向上一个page
+            // 注释写到猜测这里可以使用if，我感觉也可以使用if
+            // 因为根据AutoreleasePoolPage的结构，理论上不可能存在连续两个page都为空
             while (page->empty()) {
                 page = page->parent;
                 setHotPage(page);
             }
 
             page->unprotect();
+            // obj = page->next; page->next--;
             id obj = *--page->next;
             memset((void*)page->next, SCRIBBLE, sizeof(*page->next));
             page->protect();
 
+            // POOL_BOUNDARY为nil，是哨兵对象
             if (obj != POOL_BOUNDARY) {
+                // 释放obj对象
                 objc_release(obj);
             }
         }
 
+        // 重新设置hotPage
         setHotPage(this);
 
 #if DEBUG
@@ -828,14 +852,17 @@ class AutoreleasePoolPage
 #endif
     }
 
+    // 删除双向链表中的每一个page
     void kill() 
     {
         // Not recursive: we don't want to blow out the stack 
         // if a thread accumulates a stupendous amount of garbage
         AutoreleasePoolPage *page = this;
+        // 找到链表最末尾的page
         while (page->child) page = page->child;
 
         AutoreleasePoolPage *deathptr;
+        // 循环删除每一个page
         do {
             deathptr = page;
             page = page->parent;
@@ -876,9 +903,11 @@ class AutoreleasePoolPage
         return pageForPointer((uintptr_t)p);
     }
 
+    // 根据内存地址，获取指针所在的AutoreleasePage的首地址
     static AutoreleasePoolPage *pageForPointer(uintptr_t p) 
     {
         AutoreleasePoolPage *result;
+        // 偏移量
         uintptr_t offset = p % SIZE;
 
         assert(offset >= sizeof(AutoreleasePoolPage));
@@ -903,6 +932,7 @@ class AutoreleasePoolPage
         return EMPTY_POOL_PLACEHOLDER;
     }
 
+    // 获取正在使用的AutoreleasePoolPage
     static inline AutoreleasePoolPage *hotPage() 
     {
         AutoreleasePoolPage *result = (AutoreleasePoolPage *)
@@ -918,6 +948,8 @@ class AutoreleasePoolPage
         tls_set_direct(key, (void *)page);
     }
 
+    // coldPage，看代码应该是返回了双向链表的head结点
+    // 也就是链表中的第一个AutoreleasePoolPage
     static inline AutoreleasePoolPage *coldPage() 
     {
         AutoreleasePoolPage *result = hotPage();
@@ -949,6 +981,8 @@ class AutoreleasePoolPage
         }
     }
 
+    // 新建一个AutoreleasePoolPage，并将obj添加到新的AutoreleasePoolPage中
+    // 参数page是新AutoreleasePoolPage的父节点
     static __attribute__((noinline))
     id *autoreleaseFullPage(id obj, AutoreleasePoolPage *page)
     {
@@ -971,6 +1005,7 @@ class AutoreleasePoolPage
         return page->add(obj);
     }
 
+    // AutoreleasePool中还没有AutoreleasePoolPage
     static __attribute__((noinline))
     id *autoreleaseNoPage(id obj)
     {
@@ -1859,12 +1894,14 @@ _objc_rootHash(id obj)
 void *
 objc_autoreleasePoolPush(void)
 {
+    // 调用了AutoreleasePoolPage中的push方法
     return AutoreleasePoolPage::push();
 }
 
 void
 objc_autoreleasePoolPop(void *ctxt)
 {
+    // 调用了AutoreleasePoolPage中的pop方法
     AutoreleasePoolPage::pop(ctxt);
 }
 

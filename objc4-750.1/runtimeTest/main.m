@@ -22,6 +22,7 @@ NSString * binaryWithInteger(NSUInteger decInt){
 }
 
 int main(int argc, const char * argv[]) {
+    // 整个程序都包含在一个@autoreleasepool中
     @autoreleasepool {
         // insert code here...
         Person *p = [[Person alloc] init];
