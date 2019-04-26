@@ -641,7 +641,7 @@ class AutoreleasePoolPage
     // when the top level (i.e. libdispatch) pushes and pops pools but 
     // never uses them.
 #   define EMPTY_POOL_PLACEHOLDER ((id*)1)
-
+    // 哨兵对象
 #   define POOL_BOUNDARY nil
     static pthread_key_t const key = AUTORELEASE_POOL_KEY;
     static uint8_t const SCRIBBLE = 0xA3;  // 0xA3A3A3A3 after releasing
@@ -791,7 +791,7 @@ class AutoreleasePoolPage
         unprotect();
         id *ret = next;  // faster than `return next-1` because of aliasing
         // next = obj; next++;
-        // 也就是将obj存放在next处，并将next移动到下一个位置
+        // 也就是将obj存放在next处，并将next指向下一个位置
         *next++ = obj;
         protect();
         return ret;
@@ -1084,6 +1084,7 @@ public:
     {
         id *dest;
         // POOL_BOUNDARY就是nil
+        // 首先将一个哨兵对象插入到栈顶
         if (DebugPoolAllocation) {
             // Each autorelease pool starts on a new pool page.
             dest = autoreleaseNewPage(POOL_BOUNDARY);
