@@ -2,7 +2,6 @@
 //  Person.h
 //  runtimeTest
 //
-//  Created by lonlife on 2019/3/21.
 //
 
 #import <Foundation/Foundation.h>

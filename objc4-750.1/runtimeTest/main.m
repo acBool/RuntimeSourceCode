@@ -2,7 +2,6 @@
 //  main.m
 //  runtimeTest
 //
-//  Created by lonlife on 2019/3/15.
 //
 
 #import <Foundation/Foundation.h>
